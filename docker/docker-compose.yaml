@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-network
+
+  server:
+    build:
+      tags:
+        - ai-server:0.8.0
+      context: ..
+      dockerfile: ./server/Dockerfile
+    image: ai-server:0.8.0
+    container_name: ai-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      inference-server:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      INFERENCE_HOST: ${INFERENCE_HOST}
+      INFERENCE_GRPC_PORT: ${INFERENCE_GRPC_PORT}
+      INFERENCE_HTTP_PORT: ${INFERENCE_HTTP_PORT}
+      INFERENCE_METRICS_PORT: ${INFERENCE_METRICS_PORT}
+    volumes:
+      - ${MODEL_LOCAL_DIR}:${MODEL_DOCKER_DIR}:ro
+    env_file:
+      - .env
+    networks:
+      - ai-network
+
+  inference-server:
+    image: nvcr.io/nvidia/tritonserver:26.09-py3
+    container_name: inference-server
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+    volumes:
+      - ${MODEL_LOCAL_DIR}:${MODEL_DOCKER_DIR}
+    healthcheck:
+      test: http://infe
+    command:
+      tritonserver --model-repository=/models
+    networks:
+      - ai-network
+#    deploy: при наличии видюхи, конкретно nvidia
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: 1
+#               capabilities: [gpu]
+
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
