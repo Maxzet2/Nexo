@@ -2,26 +2,21 @@ FROM eclipse-temurin:25-jdk AS builder
 
 WORKDIR /app
 
-COPY gradlew .
-COPY gradle gradle
-COPY gradle.properties .
-COPY settings.gradle.kts .
-COPY build.gradle.kts .
-
-COPY gradle/libs.versions.toml gradle/libs.versions.toml
-
-RUN chmod +x gradlew
-
 COPY . .
-
-RUN ./gradlew :server:buildFatJar --no-daemon
+RUN chmod +x gradlew
+RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:buildFatJar --no-daemon
 
 FROM eclipse-temurin:25-jre
 
-WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/server/build/libs/*.jar app.jar
+WORKDIR /app
+COPY --from=builder /app/server/build/libs/app.jar /app/app.jar
 
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
+    CMD curl --fail --silent http://localhost:8080/healthy || exit 1
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

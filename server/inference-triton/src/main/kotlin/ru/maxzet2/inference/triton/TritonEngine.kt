@@ -17,10 +17,10 @@ class TritonEngine (
         modelName: String,
         input: ModelInput
     ): ModelOutput =
-        grpc.infer(modelName, input)
+        tritonRequest(modelName) { grpc.infer(modelName, input) }
 
     override suspend fun listModels(): List<EngineModel> =
-        http.listModels().map { entry ->
+        tritonRequest { http.listModels() }.map { entry ->
             EngineModel(
                 id = entry.name,
                 state = entry.state ?: "UNKNOWN",
@@ -28,7 +28,7 @@ class TritonEngine (
         }
 
     override suspend fun inferLogits(modelName: String, input: ModelInput): LogitsOutput {
-        return grpc.inferLogits(modelName, input)
+        return tritonRequest(modelName) { grpc.inferLogits(modelName, input) }
     }
 
     override fun close() {

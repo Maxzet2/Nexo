@@ -16,6 +16,7 @@ class HttpTritonClient (
 ) {
 
     private val client = HttpClient(CIO) {
+        expectSuccess = true
         install(ContentNegotiation) {
             json()
         }

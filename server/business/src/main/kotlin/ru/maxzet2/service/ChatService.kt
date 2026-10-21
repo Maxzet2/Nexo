@@ -4,6 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import ru.maxzet2.error.ChatNotFoundException
+import ru.maxzet2.error.MessageNotFoundException
+import ru.maxzet2.error.InvalidRequestException
 import ru.maxzet2.chat.Chat
 import ru.maxzet2.chat.Message
 import ru.maxzet2.chat.MessageStatus
@@ -27,19 +30,41 @@ class ChatService(
     @OptIn(ExperimentalUuidApi::class)
     suspend fun addMessage(
         userId: Uuid,
-        chatId: Uuid?,
+        chatId: Uuid,
+        text: String,
+        modelName: String,
+    ): SendResult {
+        val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
+            val chat = chats.getForUpdate(chatId) ?: throw ChatNotFoundException(chatId.toString())
+            val user = userMessage(chat.id, chat.currentMessageId, text)
+            messages.insert(user)
+            val draft = assistantDraft(chat.id, user.id, modelName)
+            messages.insert(draft)
+            chats.setCurrentMessage(chat.id, draft.id)
+            Prepared(chat, user, draft)
+        }
+        return generateAndFinish(prep, modelName)
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    suspend fun addMessage(
+        userId: Uuid,
         text: String,
         modelName: String,
         systemPrompt: String,
     ): SendResult {
         val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
-            val chat = if (chatId == null) {
-                val now = now()
-                Chat(Uuid.random(), text.take(60), userId, systemPrompt, null, now, now)
-                    .also { chats.create(it) }
-            } else {
-                chats.getForUpdate(chatId) ?: error("Чат $chatId не найден")
-            }
+            val now = now()
+            val chat = Chat(
+                Uuid.random(),
+                text.take(60),
+                userId,
+                systemPrompt,
+                null,
+                now,
+                now).also {
+                    chats.create(it)
+                }
             val user = userMessage(chat.id, chat.currentMessageId, text)
             messages.insert(user)
             val draft = assistantDraft(chat.id, user.id, modelName)
@@ -53,9 +78,9 @@ class ChatService(
     @OptIn(ExperimentalUuidApi::class)
     suspend fun edit(nodeId: Uuid, text: String, modelName: String): SendResult {
         val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
-            val old = messages.get(nodeId) ?: error("Сообщение $nodeId не найдено")
-            require(old.role == Role.USER) { "Редактировать можно только user-сообщения" }
-            val chat = chats.getForUpdate(old.chatId) ?: error("Чат не найден")
+            val old = messages.get(nodeId) ?: throw MessageNotFoundException(nodeId.toString())
+            if (old.role != Role.USER) throw InvalidRequestException("Редактировать можно только user-сообщения")
+            val chat = chats.getForUpdate(old.chatId) ?: throw ChatNotFoundException(old.chatId.toString())
             val user = userMessage(chat.id, old.parentId, text)   // «брат» старого узла
             messages.insert(user)
             val draft = assistantDraft(chat.id, user.id, modelName)

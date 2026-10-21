@@ -1,6 +1,7 @@
 package ru.maxzet2.plugins
 
-import io.grpc.Status
+import ru.maxzet2.error.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
@@ -29,31 +30,57 @@ class ErrorHandlingTest {
     )
 
     @Test
-    fun `null pointer returns current 400 contract`() = assertError(
-        NullPointerException("missing value"),
-        HttpStatusCode.BadRequest,
-        """{"code":"invalid_request","message":"missing value"}""",
+    fun `null pointer is an internal error`() = assertError(
+        NullPointerException("private value"), HttpStatusCode.InternalServerError,
+        """{"code":"internal_error","message":"Internal server error"}""",
     )
 
     @Test
-    fun `null pointer without message uses fallback`() = assertError(
-        NullPointerException(),
-        HttpStatusCode.BadRequest,
-        """{"code":"invalid_request","message":"Invalid request"}""",
+    fun `invalid request uses custom error`() = assertError(
+        InvalidRequestException("message is required"), HttpStatusCode.BadRequest,
+        """{"code":"invalid_request","message":"message is required"}""",
     )
 
     @Test
-    fun `grpc runtime exception returns status and description`() = assertError(
-        Status.UNAVAILABLE.withDescription("Inference server is unavailable").asRuntimeException(),
-        HttpStatusCode.InternalServerError,
-        """{"grpc_status":"UNAVAILABLE","grpc_desc":"Inference server is unavailable"}""",
+    fun `missing chat returns 404`() = assertError(
+        ChatNotFoundException("123"), HttpStatusCode.NotFound,
+        """{"code":"chat_not_found","message":"Чат 123 не найден"}""",
     )
 
     @Test
-    fun `grpc runtime exception without description returns empty description`() = assertError(
-        Status.INTERNAL.asRuntimeException(),
-        HttpStatusCode.InternalServerError,
-        """{"grpc_status":"INTERNAL","grpc_desc":""}""",
+    fun `missing message returns 404`() = assertError(
+        MessageNotFoundException("123"), HttpStatusCode.NotFound,
+        """{"code":"message_not_found","message":"Сообщение 123 не найдено"}""",
+    )
+
+    @Test
+    fun `missing model returns 404`() = assertError(
+        ModelNotFoundException("missing"), HttpStatusCode.NotFound,
+        """{"code":"model_not_found","message":"Модель 'missing' не найдена"}""",
+    )
+
+    @Test
+    fun `unavailable inference hides transport details`() = assertError(
+        InferenceUnavailableException(Exception("private host")), HttpStatusCode.ServiceUnavailable,
+        """{"code":"inference_unavailable","message":"Inference service is unavailable"}""",
+    )
+
+    @Test
+    fun `inference timeout returns 504`() = assertError(
+        InferenceTimeoutException(Exception("private details")), HttpStatusCode.GatewayTimeout,
+        """{"code":"inference_timeout","message":"Inference service timed out"}""",
+    )
+
+    @Test
+    fun `inference failure returns 502`() = assertError(
+        InferenceFailedException(Exception("private details")), HttpStatusCode.BadGateway,
+        """{"code":"inference_failed","message":"Inference service failed"}""",
+    )
+
+    @Test
+    fun `bad request body hides parser details`() = assertError(
+        BadRequestException("parser details"), HttpStatusCode.BadRequest,
+        """{"code":"invalid_request","message":"Invalid request body"}""",
     )
 
     @Test

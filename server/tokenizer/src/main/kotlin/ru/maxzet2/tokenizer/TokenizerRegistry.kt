@@ -1,5 +1,7 @@
 package ru.maxzet2.tokenizer
 
+import ru.maxzet2.error.InvalidRequestException
+import ru.maxzet2.error.ModelNotFoundException
 import Tokenizer
 import java.nio.file.Files
 import java.nio.file.Path
@@ -14,12 +16,12 @@ class TokenizerRegistry(
     fun forModel(modelName: String): Tokenizer =
         cache.computeIfAbsent(modelName) {
             val dir = root.resolve(modelName).normalize()
-            require(dir.startsWith(root)) { "Некорректное имя модели: $modelName" }
+            if (!dir.startsWith(root) || dir == root) {
+                throw InvalidRequestException("Некорректное имя модели: $modelName")
+            }
 
             val file = dir.resolve("tokenizer.json")
-            require(Files.exists(file)) {
-                "Не найден токенайзер для модели '$modelName': $file"
-            }
+            if (!Files.isRegularFile(file)) throw ModelNotFoundException(modelName)
 
             HuggingFaceTokenizerAdapter(file)
         }

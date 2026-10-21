@@ -1,5 +1,7 @@
 package ru.maxzet2.routing.routings
 
+import AddMessageInNewChatRequest
+import AddMessageRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.request.receive
@@ -9,6 +11,7 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import org.koin.ktor.ext.inject
+import ru.maxzet2.error.InvalidRequestException
 import ru.maxzet2.service.ChatService
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -16,19 +19,29 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 fun Application.configureChatRouting() {
     val service: ChatService by inject()
-//    val adminId = Uuid.parse(System.getenv("ADMIN_ID")) типа админка
 
     routing {
         route("/chat") {
-            post("/chat/messages") {
+            post("/chat/message") {
                 val req = call.receive<AddMessageRequest>()
                 if (req.model.isBlank() || req.message.isBlank() || req.userId.isBlank()) {
-                    call.respond(HttpStatusCode.BadRequest, "userid, model and message are required")
-                    return@post
+                    throw InvalidRequestException("userid, model and message are required")
                 }
                 val result = service.addMessage(
-                    userId = Uuid.parse(req.userId),
-                    chatId = Uuid.parse(req.chatId.toString()),
+                    userId = Uuid.parseOrNull(req.userId) ?: throw InvalidRequestException("userId must be a UUID"),
+                    chatId = Uuid.parseOrNull(req.chatId) ?: throw InvalidRequestException("chatId must be a UUID"),
+                    text = req.message,
+                    modelName = req.model,
+                )
+                call.respond(HttpStatusCode.OK, result)
+            }
+            post("/chat/message-in-new-chat") {
+                val req = call.receive<AddMessageInNewChatRequest>()
+                if (req.model.isBlank() || req.message.isBlank() || req.userId.isBlank()) {
+                    throw InvalidRequestException("userid, model and message are required")
+                }
+                val result = service.addMessage(
+                    userId = Uuid.parseOrNull(req.userId) ?: throw InvalidRequestException("userId must be a UUID"),
                     text = req.message,
                     modelName = req.model,
                     systemPrompt = req.systemPrompt,
@@ -38,12 +51,3 @@ fun Application.configureChatRouting() {
         }
     }
 }
-
-@Serializable
-data class AddMessageRequest(
-    val chatId: String? = null,
-    val userId: String,
-    val model: String,
-    val message: String,
-    val systemPrompt: String = "",
-)
