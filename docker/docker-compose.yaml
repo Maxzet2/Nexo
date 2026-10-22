@@ -21,10 +21,10 @@ services:
   server:
     build:
       tags:
-        - ai-server:0.8.0
+        - ai-server:0.9.0
       context: ..
       dockerfile: ./server/Dockerfile
-    image: ai-server:0.8.0
+    image: ai-server:0.9.0
     container_name: ai-server
     restart: unless-stopped
     ports:

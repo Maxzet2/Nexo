@@ -2,7 +2,10 @@ FROM eclipse-temurin:25-jdk AS builder
 
 WORKDIR /app
 
-COPY . .
+COPY gradlew gradle.properties settings.gradle.kts build.gradle.kts ./
+COPY gradle/ ./gradle/
+COPY client/build.gradle.kts ./client/build.gradle.kts
+COPY server/ ./server/
 RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:buildFatJar --no-daemon
 
