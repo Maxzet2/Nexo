@@ -64,9 +64,8 @@ class ExposedChatRepository : ChatRepository {
             .singleOrNull()
             ?.toChat()
 
-    override fun setCurrentMessage(id: Uuid, messageId: Uuid) {
+    override fun touch(id: Uuid) {
         ChatTable.update({ ChatTable.id eq id }) {
-            it[currentMessageId] = messageId
             it[updatedAt] = kotlin.time.Clock.System.now()
         }
     }

@@ -16,4 +16,5 @@ data class SendResult @OptIn(ExperimentalUuidApi::class) constructor(
     val chatId: Uuid,
     val userNodeId: Uuid,
     val assistantNodeId: Uuid,
+    val text: String,
 )

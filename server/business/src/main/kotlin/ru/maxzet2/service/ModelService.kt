@@ -2,7 +2,6 @@ package ru.maxzet2.service
 
 import ru.maxzet2.chat.Message
 import ru.maxzet2.common.ModelInput
-import ru.maxzet2.common.Role
 import ru.maxzet2.inference.InferenceEngine
 import ru.maxzet2.tokenizer.TokenizerRegistry
 
@@ -59,16 +58,11 @@ class ModelService(
 
     private fun buildPrompt(systemPrompt: String, history: List<Message>): String = buildString {
         if (systemPrompt.isNotBlank()) {
-            appendLine("System: ${systemPrompt.trim()}")
+            appendLine(systemPrompt.trim())
             appendLine()
         }
         for (m in history) {
-            when (m.role) {
-                Role.USER -> appendLine("User: ${m.content.trim()}")
-                Role.ASSISTANT -> appendLine("Assistant: ${m.content.trim()}")
-                Role.SYSTEM -> Unit
-            }
+            appendLine(m.content)
         }
-        append("Assistant:")
     }
 }

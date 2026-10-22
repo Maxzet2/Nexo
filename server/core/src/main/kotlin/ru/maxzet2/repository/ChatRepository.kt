@@ -11,7 +11,7 @@ interface ChatRepository {
     fun getForUpdate(id: Uuid): Chat?
 
     @OptIn(ExperimentalUuidApi::class)
-    fun setCurrentMessage(id: Uuid, messageId: Uuid)
+    fun touch(id: Uuid)
 
     @OptIn(ExperimentalUuidApi::class)
     fun listByCreator(userId: Uuid): List<Chat>

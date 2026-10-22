@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import ru.maxzet2.error.ChatBusyException
 import ru.maxzet2.error.ChatNotFoundException
 import ru.maxzet2.error.MessageNotFoundException
 import ru.maxzet2.error.InvalidRequestException
@@ -31,16 +32,24 @@ class ChatService(
     suspend fun addMessage(
         userId: Uuid,
         chatId: Uuid,
+        parentId: Uuid,
         text: String,
         modelName: String,
     ): SendResult {
         val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
             val chat = chats.getForUpdate(chatId) ?: throw ChatNotFoundException(chatId.toString())
-            val user = userMessage(chat.id, chat.currentMessageId, text)
+            if (messages.listByChat(chat.id).any { it.status == MessageStatus.GENERATING }) {
+                throw ChatBusyException()
+            }
+            val parent = messages.get(parentId) ?: throw MessageNotFoundException(parentId.toString())
+            if (parent.chatId != chat.id || parent.role != Role.ASSISTANT || parent.status != MessageStatus.DONE) {
+                throw InvalidRequestException("parentId должен указывать на завершённый ответ этого чата")
+            }
+            val user = userMessage(chat.id, parent.id, text)
             messages.insert(user)
             val draft = assistantDraft(chat.id, user.id, modelName)
             messages.insert(draft)
-            chats.setCurrentMessage(chat.id, draft.id)
+            chats.touch(chat.id)
             Prepared(chat, user, draft)
         }
         return generateAndFinish(prep, modelName)
@@ -65,11 +74,11 @@ class ChatService(
                 now).also {
                     chats.create(it)
                 }
-            val user = userMessage(chat.id, chat.currentMessageId, text)
+            val user = userMessage(chat.id, null, text)
             messages.insert(user)
             val draft = assistantDraft(chat.id, user.id, modelName)
             messages.insert(draft)
-            chats.setCurrentMessage(chat.id, draft.id)
+            chats.touch(chat.id)
             Prepared(chat, user, draft)
         }
         return generateAndFinish(prep, modelName)
@@ -77,15 +86,19 @@ class ChatService(
 
     @OptIn(ExperimentalUuidApi::class)
     suspend fun edit(nodeId: Uuid, text: String, modelName: String): SendResult {
+        if (text.isBlank() || modelName.isBlank()) throw InvalidRequestException("model and message are required")
         val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
             val old = messages.get(nodeId) ?: throw MessageNotFoundException(nodeId.toString())
             if (old.role != Role.USER) throw InvalidRequestException("Редактировать можно только user-сообщения")
             val chat = chats.getForUpdate(old.chatId) ?: throw ChatNotFoundException(old.chatId.toString())
+            if (messages.listByChat(chat.id).any { it.status == MessageStatus.GENERATING }) {
+                throw ChatBusyException()
+            }
             val user = userMessage(chat.id, old.parentId, text)   // «брат» старого узла
             messages.insert(user)
             val draft = assistantDraft(chat.id, user.id, modelName)
             messages.insert(draft)
-            chats.setCurrentMessage(chat.id, draft.id)
+            chats.touch(chat.id)
             Prepared(chat, user, draft)
         }
         return generateAndFinish(prep, modelName)
@@ -102,11 +115,11 @@ class ChatService(
                 models.generate(modelName, p.chat.systemPrompt, history, maxTokens = 10)
             }
             finish(p.draft.id, text, MessageStatus.DONE, started, null)
+            return SendResult(p.chat.id, p.user.id, p.draft.id, text)
         } catch (e: Exception) {
             finish(p.draft.id, "", MessageStatus.FAILED, started, e.message)
             throw e
         }
-        return SendResult(p.chat.id, p.user.id, p.draft.id)
     }
 
     @OptIn(ExperimentalUuidApi::class)
@@ -130,6 +143,12 @@ class ChatService(
                 error = error,
             )
         }
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    suspend fun listMessages(chatId: Uuid): List<Message> = newSuspendedTransaction(Dispatchers.IO) {
+        chats.getForUpdate(chatId) ?: throw ChatNotFoundException(chatId.toString())
+        messages.listByChat(chatId)
     }
 
     private fun now(): Instant = Clock.System.now()

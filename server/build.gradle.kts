@@ -27,6 +27,9 @@ dependencies {
     implementation(libs.logback.classic)
 
     testImplementation(kotlin("test"))
+    testImplementation(libs.exposed.jdbc)
+    testImplementation(libs.exposed.kotlin.datetime)
+    testImplementation(libs.h2)
     testImplementation(libs.ktor.server.test.host)
 }
 

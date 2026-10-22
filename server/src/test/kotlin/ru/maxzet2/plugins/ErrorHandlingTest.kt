@@ -42,6 +42,12 @@ class ErrorHandlingTest {
     )
 
     @Test
+    fun `busy chat returns 409`() = assertError(
+        ChatBusyException(), HttpStatusCode.Conflict,
+        """{"code":"chat_busy","message":"В этом чате уже идёт генерация"}""",
+    )
+
+    @Test
     fun `missing chat returns 404`() = assertError(
         ChatNotFoundException("123"), HttpStatusCode.NotFound,
         """{"code":"chat_not_found","message":"Чат 123 не найден"}""",

@@ -14,7 +14,7 @@ GET {{server}}/model/get-available
 > {% client.test("Models are available", function () { client.assert(response.status === 200); }); %}
 
 ### Новый чат → 200 (нужны PostgreSQL, Triton и tokenizer.json для выбранной модели)
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message-in-new-chat
 Content-Type: application/json
 
 {
@@ -30,15 +30,20 @@ Content-Type: application/json
         client.assert(!!response.body.chatId);
         client.assert(!!response.body.assistantNodeId);
     });
-    if (response.status === 200) client.global.set("createdChatId", response.body.chatId);
+    if (response.status === 200) {
+        client.global.set("createdChatId", response.body.chatId);
+        client.global.set("userNodeId", response.body.userNodeId);
+        client.global.set("assistantNodeId", response.body.assistantNodeId);
+    }
 %}
 
 ### Продолжить чат (сначала выполнить успешное создание выше) → 200
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message
 Content-Type: application/json
 
 {
   "chatId": "{{createdChatId}}",
+  "parentId": "{{assistantNodeId}}",
   "userId": "{{userId}}",
   "model": "{{modelName}}",
   "message": "Tell me more."
@@ -47,7 +52,7 @@ Content-Type: application/json
 > {% client.test("Message sent", function () { client.assert(response.status === 200); }); %}
 
 ### Пустое сообщение → 400 invalid_request
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message-in-new-chat
 Content-Type: application/json
 
 {
@@ -59,7 +64,7 @@ Content-Type: application/json
 > {% client.test("Empty message rejected", function () { client.assert(response.status === 400); client.assert(response.body.code === "invalid_request"); }); %}
 
 ### Некорректный UUID → 400 invalid_request
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message-in-new-chat
 Content-Type: application/json
 
 {
@@ -71,7 +76,7 @@ Content-Type: application/json
 > {% client.test("Invalid UUID rejected", function () { client.assert(response.status === 400); client.assert(response.body.code === "invalid_request"); }); %}
 
 ### Отсутствует обязательное поле message → 400 invalid_request
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message-in-new-chat
 Content-Type: application/json
 
 {
@@ -82,11 +87,12 @@ Content-Type: application/json
 > {% client.test("Missing field rejected", function () { client.assert(response.status === 400); client.assert(response.body.code === "invalid_request"); }); %}
 
 ### Несуществующий чат → 404 chat_not_found (нужен PostgreSQL)
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message
 Content-Type: application/json
 
 {
   "chatId": "00000000-0000-0000-0000-000000000000",
+  "parentId": "00000000-0000-0000-0000-000000000000",
   "userId": "{{userId}}",
   "model": "{{modelName}}",
   "message": "Hello"
@@ -96,7 +102,7 @@ Content-Type: application/json
 
 ### Несуществующая модель → 404 model_not_found (нужен PostgreSQL)
 # Создаёт чат с неудавшимся ответом: история сохраняется согласно текущей бизнес-логике.
-POST {{server}}/chat/chat/messages
+POST {{server}}/chat/chat/message-in-new-chat
 Content-Type: application/json
 
 {
@@ -106,3 +112,23 @@ Content-Type: application/json
 }
 
 > {% client.test("Missing model", function () { client.assert(response.status === 404); client.assert(response.body.code === "model_not_found"); }); %}
+
+
+### Всё дерево сообщений; клиент строит ветки по parentId
+GET {{server}}/chat/{{createdChatId}}/messages
+
+### Редактирование создаёт новую ветку, исходное сообщение сохраняется
+PATCH {{server}}/chat/messages/{{userNodeId}}
+Content-Type: application/json
+
+{
+  "message": "Hello! Tell me something else.",
+  "model": "{{modelName}}"
+}
+
+> {%
+    client.test("Branch created", function () {
+        client.assert(response.status === 200);
+        client.assert(typeof response.body.text === "string");
+    });
+%}

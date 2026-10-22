@@ -7,6 +7,7 @@ sealed class ServiceException(
 ) : RuntimeException(message, cause)
 
 class InvalidRequestException(message: String) : ServiceException("invalid_request", message)
+class ChatBusyException : ServiceException("chat_busy", "В этом чате уже идёт генерация")
 class ChatNotFoundException(id: String) : ServiceException("chat_not_found", "Чат $id не найден")
 class MessageNotFoundException(id: String) : ServiceException("message_not_found", "Сообщение $id не найдено")
 class ModelNotFoundException(name: String) : ServiceException("model_not_found", "Модель '$name' не найдена")

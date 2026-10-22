@@ -16,6 +16,7 @@ fun Application.configureErrorHandling() {
         exception<ServiceException> { call, error ->
             val status = when (error) {
                 is InvalidRequestException -> HttpStatusCode.BadRequest
+                is ChatBusyException -> HttpStatusCode.Conflict
                 is ChatNotFoundException, is MessageNotFoundException, is ModelNotFoundException -> HttpStatusCode.NotFound
                 is InferenceUnavailableException -> HttpStatusCode.ServiceUnavailable
                 is InferenceTimeoutException -> HttpStatusCode.GatewayTimeout
