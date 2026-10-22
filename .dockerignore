@@ -1,0 +1,98 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+.vscode/
+out/
+.idea_modules/
+
+# Docker
+docker/
+Dockerfile
+.dockerignore
+docker-compose*.yml
+docker-compose*.yaml
+
+# Env
+.env
+.env.*
+*.env
+secrets/
+*.pem
+*.key
+*.crt
+
+# Логи и временные файлы
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# Kotlin / Java / Gradle
+.gradle/
+build/
+*/build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+gradlew.bat
+.kotlin/
+
+# Node
+node_modules/
+*/node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.next/
+.nuxt/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Данные Postgres / модели / датасеты
+postgres_data/
+pgdata/
+data/
+datasets/
+model_repository/
+models/
+*.sqlite
+*.db
+
+# OS-мусор
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Документация и метаданные
+README.md
+README*
+LICENSE
+CHANGELOG*
+docs/
+*.md
+!server/README.md
+
+# Тесты и покрытие
+coverage/
+.nyc_output/
+*.lcov
+jacoco.exec

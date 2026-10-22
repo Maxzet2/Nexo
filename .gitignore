@@ -40,3 +40,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Папка с моделями для Inference сервака ###
+model_repository
