@@ -1,0 +1,71 @@
+### Переменные
+@triton = http://localhost:8000
+@metrics = http://localhost:8002
+@model = gpt2
+
+### Готовность сервера → 200, если готов; иначе 503
+GET {{triton}}/v2/health/ready
+
+### Живость сервера
+GET {{triton}}/v2/health/live
+
+### Метаданные сервера и поддерживаемые расширения
+GET {{triton}}/v2
+
+### Все модели в репозитории (включая неготовые)
+# https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/protocol/extension_model_repository.html
+POST {{triton}}/v2/repository/index
+Content-Type: application/json
+
+{}
+
+### Только модели, готовые к инференсу
+POST {{triton}}/v2/repository/index
+Content-Type: application/json
+
+{"ready": true}
+
+### Готовность выбранной модели
+GET {{triton}}/v2/models/{{model}}/ready
+
+### Метаданные: имена, типы и формы входов/выходов
+GET {{triton}}/v2/models/{{model}}
+
+### Конфигурация модели
+GET {{triton}}/v2/models/{{model}}/config
+
+### Статистика модели
+GET {{triton}}/v2/models/{{model}}/stats
+
+### Один шаг инференса GPT-2: токены на входе, logits на выходе
+# Пример для модели с входами input_ids и attention_mask типа INT64.
+# Сверьте входы с метаданными выше: конкретный экспорт может требовать
+# token_type_ids (нули) и/или position_ids ([0, 1, 2]) формы [1, 3].
+# IDs ниже — пример токенов GPT-2; запрос возвращает logits, а не готовый текст.
+POST {{triton}}/v2/models/{{model}}/infer
+Content-Type: application/json
+
+{
+  "inputs": [
+    {"name": "input_ids", "shape": [1, 3], "datatype": "INT64", "data": [15496, 11, 995]},
+    {"name": "attention_mask", "shape": [1, 3], "datatype": "INT64", "data": [1, 1, 1]}
+  ],
+  "outputs": [{"name": "logits"}]
+}
+
+### Метрики Prometheus
+GET {{metrics}}/metrics
+
+### Загрузить или перезагрузить модель
+# Для этой ручки и unload нужен --model-control-mode=explicit.
+# В текущем docker-compose.yaml этот режим не включён.
+POST {{triton}}/v2/repository/models/{{model}}/load
+Content-Type: application/json
+
+{}
+
+### Выгрузить модель (только explicit mode)
+POST {{triton}}/v2/repository/models/{{model}}/unload
+Content-Type: application/json
+
+{}
