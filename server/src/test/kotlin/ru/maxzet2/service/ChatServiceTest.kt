@@ -2,7 +2,6 @@
 
 package ru.maxzet2.service
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
@@ -26,10 +25,10 @@ class ChatServiceTest {
     private val messages = ExposedMessageRepository()
     private val tokenizerRoot = Files.createTempDirectory("chat-test-tokenizers")
     private val engine = object : InferenceEngine {
-        override suspend fun isReady() = true
-        override suspend fun listModels() = emptyList<ru.maxzet2.dto.EngineModel>()
-        override suspend fun infer(modelName: String, input: ModelInput): ModelOutput = error("Unexpected inference")
-        override suspend fun inferLogits(modelName: String, input: ModelInput): LogitsOutput = error("Unexpected inference")
+        override fun isReady() = true
+        override fun listModels() = emptyList<ru.maxzet2.dto.EngineModel>()
+        override fun infer(modelName: String, input: ModelInput): ModelOutput = error("Unexpected inference")
+        override fun inferLogits(modelName: String, input: ModelInput): LogitsOutput = error("Unexpected inference")
         override fun close() = Unit
     }
     private val service = ChatService(chats, messages, ModelService(engine, TokenizerRegistry(tokenizerRoot)))
@@ -53,7 +52,7 @@ class ChatServiceTest {
     }
 
     @Test
-    fun `busy chat rejects both continuation and editing without adding nodes`() = runBlocking {
+    fun `busy chat rejects both continuation and editing without adding nodes`() {
         val chat = createChat()
         val user = insertMessage(chat, null, Role.USER)
         val answer = insertMessage(chat, user.id, Role.ASSISTANT, MessageStatus.GENERATING)
@@ -63,7 +62,7 @@ class ChatServiceTest {
     }
 
     @Test
-    fun `parent from another chat and non assistant parents are rejected`() = runBlocking {
+    fun `parent from another chat and non assistant parents are rejected`() {
         val chat = createChat()
         val user = insertMessage(chat, null, Role.USER)
         val otherChat = createChat()
@@ -76,7 +75,7 @@ class ChatServiceTest {
     }
 
     @Test
-    fun `editing creates a sibling and preserves the original subtree`() = runBlocking {
+    fun `editing creates a sibling and preserves the original subtree`() {
         val chat = createChat()
         val user = insertMessage(chat, null, Role.USER)
         val answer = insertMessage(chat, user.id, Role.ASSISTANT)
@@ -92,7 +91,7 @@ class ChatServiceTest {
     }
 
     @Test
-    fun `client parent determines the branch and another busy chat does not block it`() = runBlocking {
+    fun `client parent determines the branch and another busy chat does not block it`() {
         val chat = createChat()
         val user = insertMessage(chat, null, Role.USER)
         val first = insertMessage(chat, user.id, Role.ASSISTANT)
@@ -112,7 +111,7 @@ class ChatServiceTest {
         assertEquals(response, Json.decodeFromString<List<MessageResponse>>(Json.encodeToString(response)))
     }
 
-    private suspend fun continueChat(chat: Chat, parentId: Uuid) =
+    private fun continueChat(chat: Chat, parentId: Uuid) =
         service.addMessage(owner, chat.id, parentId, "continue", "missing")
 
     private fun createChat(): Chat = transaction(database) {

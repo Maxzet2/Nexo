@@ -6,8 +6,8 @@ import org.koin.dsl.module
 import ru.maxzet2.db.ExposedChatRepository
 import ru.maxzet2.db.ExposedMessageRepository
 import ru.maxzet2.inference.InferenceEngine
-import ru.maxzet2.inference.triton.GrpcTritonClient
-import ru.maxzet2.inference.triton.HttpTritonClient
+import ru.maxzet2.inference.triton.GrpcClient
+import ru.maxzet2.inference.triton.HttpClient
 import ru.maxzet2.inference.triton.TritonEngine
 import ru.maxzet2.repository.ChatRepository
 import ru.maxzet2.repository.MessageRepository
@@ -31,8 +31,8 @@ fun getModules() : List<Module> {
                 val httpPort = System.getenv("INFERENCE_HTTP_PORT")?.toIntOrNull() ?: 8000
 
                 TritonEngine(
-                    grpc = GrpcTritonClient(host, grpcPort),
-                    http = HttpTritonClient("http://$host:$httpPort"),
+                    grpc = GrpcClient(host, grpcPort),
+                    http = HttpClient("http://$host:$httpPort"),
                 )
             }
 

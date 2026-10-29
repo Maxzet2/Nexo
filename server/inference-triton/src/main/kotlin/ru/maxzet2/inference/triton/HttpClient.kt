@@ -9,9 +9,10 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.runBlocking
 import ru.maxzet2.dto.TritonModelEntry
 
-class HttpTritonClient (
+class HttpClient (
     private val baseUrl: String,
 ) {
 
@@ -22,8 +23,8 @@ class HttpTritonClient (
         }
     }
 
-    suspend fun listModels(): List<TritonModelEntry> {
-        return client.post("$baseUrl/v2/repository/index") {
+    fun listModels(): List<TritonModelEntry> = runBlocking {
+        client.post("$baseUrl/v2/repository/index") {
             contentType(ContentType.Application.Json)
             setBody("{}")
         }.body()

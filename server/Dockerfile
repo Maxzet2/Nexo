@@ -1,4 +1,6 @@
-FROM eclipse-temurin:25-jdk AS builder
+FROM bellsoft/liberica-runtime-container:jdk-25-glibc AS builder
+
+RUN apk add --no-cache libstdc++ # для токенизатора
 
 WORKDIR /app
 
@@ -9,17 +11,11 @@ COPY server/ ./server/
 RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:buildFatJar --no-daemon
 
-FROM eclipse-temurin:25-jre
+FROM bellsoft/liberica-runtime-container:jre-25-slim-glibc
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /usr/lib/libstdc++.so.6* /usr/lib/libgcc_s.so.1 /usr/lib/
 
 WORKDIR /app
 COPY --from=builder /app/server/build/libs/app.jar /app/app.jar
-
-EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
-    CMD curl --fail --silent http://localhost:8080/healthy || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

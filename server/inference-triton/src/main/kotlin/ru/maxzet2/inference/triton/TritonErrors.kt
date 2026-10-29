@@ -10,7 +10,7 @@ import kotlinx.serialization.SerializationException
 import ru.maxzet2.error.*
 import java.io.IOException
 
-internal suspend fun <T> tritonRequest(modelName: String? = null, block: suspend () -> T): T = try {
+internal fun <T> tritonRequest(modelName: String? = null, block: () -> T): T = try {
     block()
 } catch (error: CancellationException) {
     throw error

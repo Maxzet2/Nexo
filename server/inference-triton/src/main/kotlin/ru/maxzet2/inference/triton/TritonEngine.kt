@@ -7,19 +7,19 @@ import ru.maxzet2.dto.EngineModel
 import ru.maxzet2.inference.InferenceEngine
 
 class TritonEngine (
-    private val grpc: GrpcTritonClient,
-    private val http: HttpTritonClient,
+    private val grpc: GrpcClient,
+    private val http: HttpClient,
 ) : InferenceEngine {
 
-    override suspend fun isReady(): Boolean = grpc.isReady()
+    override fun isReady(): Boolean = grpc.isReady()
 
-    override suspend fun infer(
+    override fun infer(
         modelName: String,
         input: ModelInput
     ): ModelOutput =
         tritonRequest(modelName) { grpc.infer(modelName, input) }
 
-    override suspend fun listModels(): List<EngineModel> =
+    override fun listModels(): List<EngineModel> =
         tritonRequest { http.listModels() }.map { entry ->
             EngineModel(
                 id = entry.name,
@@ -27,7 +27,7 @@ class TritonEngine (
             )
         }
 
-    override suspend fun inferLogits(modelName: String, input: ModelInput): LogitsOutput {
+    override fun inferLogits(modelName: String, input: ModelInput): LogitsOutput {
         return tritonRequest(modelName) { grpc.inferLogits(modelName, input) }
     }
 

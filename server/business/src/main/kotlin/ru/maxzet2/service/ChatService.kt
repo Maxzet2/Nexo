@@ -1,9 +1,6 @@
 package ru.maxzet2.service
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import ru.maxzet2.error.ChatBusyException
 import ru.maxzet2.error.ChatNotFoundException
 import ru.maxzet2.error.MessageNotFoundException
@@ -26,17 +23,17 @@ class ChatService(
     private val messages: MessageRepository,
     private val models: ModelService
 ) {
-    private val gate = Semaphore(1)
+    private val gate = Any()
 
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun addMessage(
+    fun addMessage(
         userId: Uuid,
         chatId: Uuid,
         parentId: Uuid,
         text: String,
         modelName: String,
     ): SendResult {
-        val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
+        val prep: Prepared = transaction {
             val chat = chats.getForUpdate(chatId) ?: throw ChatNotFoundException(chatId.toString())
             if (messages.listByChat(chat.id).any { it.status == MessageStatus.GENERATING }) {
                 throw ChatBusyException()
@@ -56,13 +53,13 @@ class ChatService(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun addMessage(
+    fun addMessage(
         userId: Uuid,
         text: String,
         modelName: String,
         systemPrompt: String,
     ): SendResult {
-        val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
+        val prep: Prepared = transaction {
             val now = now()
             val chat = Chat(
                 Uuid.random(),
@@ -85,9 +82,9 @@ class ChatService(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun edit(nodeId: Uuid, text: String, modelName: String): SendResult {
+    fun edit(nodeId: Uuid, text: String, modelName: String): SendResult {
         if (text.isBlank() || modelName.isBlank()) throw InvalidRequestException("model and message are required")
-        val prep: Prepared = newSuspendedTransaction(Dispatchers.IO) {
+        val prep: Prepared = transaction {
             val old = messages.get(nodeId) ?: throw MessageNotFoundException(nodeId.toString())
             if (old.role != Role.USER) throw InvalidRequestException("Редактировать можно только user-сообщения")
             val chat = chats.getForUpdate(old.chatId) ?: throw ChatNotFoundException(old.chatId.toString())
@@ -105,13 +102,13 @@ class ChatService(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    private suspend fun generateAndFinish(p: Prepared, modelName: String): SendResult {
-        val history: List<Message> = newSuspendedTransaction(Dispatchers.IO) {
+    private fun generateAndFinish(p: Prepared, modelName: String): SendResult {
+        val history: List<Message> = transaction {
             messages.pathToRoot(p.user.id)
         }
         val started = System.nanoTime()
         try {
-            val text = gate.withPermit {
+            val text = synchronized(gate) {
                 models.generate(modelName, p.chat.systemPrompt, history, maxTokens = 10)
             }
             finish(p.draft.id, text, MessageStatus.DONE, started, null)
@@ -123,7 +120,7 @@ class ChatService(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    private suspend fun finish(
+    private fun finish(
         id: Uuid,
         content: String,
         status: MessageStatus,
@@ -131,7 +128,7 @@ class ChatService(
         error: String?,
     ) {
         val latency = ((System.nanoTime() - startedNanos) / 1_000_000).toInt()
-        newSuspendedTransaction(Dispatchers.IO) {
+        transaction {
             messages.finish(
                 id = id,
                 content = content,
@@ -146,7 +143,7 @@ class ChatService(
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    suspend fun listMessages(chatId: Uuid): List<Message> = newSuspendedTransaction(Dispatchers.IO) {
+    fun listMessages(chatId: Uuid): List<Message> = transaction {
         chats.getForUpdate(chatId) ?: throw ChatNotFoundException(chatId.toString())
         messages.listByChat(chatId)
     }

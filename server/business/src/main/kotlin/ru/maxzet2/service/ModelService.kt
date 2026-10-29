@@ -15,9 +15,9 @@ class ModelService(
 
     private val eosByModel = mapOf("gpt2" to 50256L)
 
-    suspend fun listAvailable() = engine.listModels()
+    fun listAvailable() = engine.listModels()
 
-    suspend fun generate(
+    fun generate(
         modelName: String,
         systemPrompt: String,
         history: List<Message>,

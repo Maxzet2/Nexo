@@ -6,13 +6,13 @@ import ru.maxzet2.common.ModelOutput
 import ru.maxzet2.dto.EngineModel
 
 interface InferenceEngine : AutoCloseable { // лучший кандидат на микросервисы
-    suspend fun isReady(): Boolean
-    suspend fun infer(
+    fun isReady(): Boolean
+    fun infer(
         modelName: String,
         input: ModelInput
     ): ModelOutput
 
-    suspend fun listModels(): List<EngineModel>
+    fun listModels(): List<EngineModel>
 
-    suspend fun inferLogits(modelName: String, input: ModelInput): LogitsOutput
+    fun inferLogits(modelName: String, input: ModelInput): LogitsOutput
 }

@@ -1,7 +1,7 @@
 package ru.maxzet2.inference.triton
 
 import com.google.protobuf.ByteString
-import inference.GRPCInferenceServiceGrpcKt
+import inference.GRPCInferenceServiceGrpc
 import inference.GrpcService
 import io.grpc.ManagedChannelBuilder
 import ru.maxzet2.common.LogitsOutput
@@ -10,11 +10,8 @@ import ru.maxzet2.common.ModelOutput
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.get
-import kotlin.div
-import kotlin.text.toInt
 
-class GrpcTritonClient(
+class GrpcClient(
     host: String,
     port: Int,
 ) : AutoCloseable {
@@ -25,9 +22,9 @@ class GrpcTritonClient(
         .maxInboundMessageSize(256 * 1024 * 1024)
         .build()
 
-    private val stub = GRPCInferenceServiceGrpcKt.GRPCInferenceServiceCoroutineStub(channel)
+    private val stub = GRPCInferenceServiceGrpc.newBlockingStub(channel)
 
-    suspend fun isReady(): Boolean = try {
+    fun isReady(): Boolean = try {
         stub.serverReady(
             GrpcService.ServerReadyRequest.getDefaultInstance()
         ).ready
@@ -35,7 +32,7 @@ class GrpcTritonClient(
         false
     }
 
-    suspend fun infer(
+    fun infer(
         modelName: String,
         input: ModelInput
     ): ModelOutput {
@@ -109,7 +106,7 @@ class GrpcTritonClient(
 
     private val inputNamesCache = ConcurrentHashMap<String, List<String>>()
 
-    private suspend fun inputNames(model: String): List<String> =
+    private fun inputNames(model: String): List<String> =
         inputNamesCache[model] ?: stub
             .modelMetadata(GrpcService.ModelMetadataRequest.newBuilder().setName(model).build())
             .inputsList.map { it.name }
@@ -121,7 +118,7 @@ class GrpcTritonClient(
         return ByteString.copyFrom(buf.array())
     }
 
-    suspend fun inferLogits(modelName: String, input: ModelInput): LogitsOutput {
+    fun inferLogits(modelName: String, input: ModelInput): LogitsOutput {
         val n = input.inputIds.size
 
         val available = mapOf(
